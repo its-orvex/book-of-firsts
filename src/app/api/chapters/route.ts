@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { put, list } from '@vercel/blob'
 import { initialChapters } from '@/data/chapters'
+import { defaultConfig } from '@/data/config'
 import type { BookData } from '@/lib/types'
 
 const BLOB_KEY = 'chapters-data.json'
@@ -9,16 +10,15 @@ export async function GET() {
   try {
     const { blobs } = await list({ prefix: BLOB_KEY })
     if (blobs.length === 0) {
-      const data: BookData = { chapters: initialChapters, lastUpdated: new Date().toISOString() }
-      return NextResponse.json(data)
+      return NextResponse.json({ chapters: initialChapters, config: defaultConfig, lastUpdated: new Date().toISOString() })
     }
-    const blob = blobs[0]
-    const res = await fetch(blob.url)
+    const res = await fetch(blobs[0].url)
     const data = await res.json()
+    // Backfill config if missing from older saves
+    if (!data.config) data.config = defaultConfig
     return NextResponse.json(data)
   } catch {
-    const data: BookData = { chapters: initialChapters, lastUpdated: new Date().toISOString() }
-    return NextResponse.json(data)
+    return NextResponse.json({ chapters: initialChapters, config: defaultConfig, lastUpdated: new Date().toISOString() })
   }
 }
 

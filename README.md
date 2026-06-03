@@ -1,43 +1,75 @@
 # Our Book of Firsts 📖
+Dilee & Ashley — Year One
 
-A private digital book documenting Dilee & Ashley's first year together.
+---
 
-## Setup
+## First-time setup
 
 ```bash
+cd book-of-firsts-final
 npm install
 ```
 
-## Environment Variables
-
-Create a `.env.local` file:
-
+Create `.env.local`:
 ```
-BLOB_READ_WRITE_TOKEN=your_vercel_blob_token_here
+BLOB_READ_WRITE_TOKEN=your_token_here
 ```
 
-Get your token: vercel.com → your project → Storage → Create Blob Store → copy `BLOB_READ_WRITE_TOKEN`
+Test locally:
+```bash
+npm run dev
+```
 
-Photos are linked from Google Photos — no photo storage needed on Vercel.
+Deploy:
+```bash
+vercel --prod
+```
+
+---
 
 ## Passwords
+- **Ashley (read-only):** `ashleyndileeforever`
+- **Builder (your editor):** `dileeonly`
 
-- **Ashley's password**: `ashleyndileeforever`
-- **Builder password**: `dileeonly`
+---
 
-## Deploy to Vercel
+## How to add photos
 
-```bash
-npm install
-vercel
-```
+1. Copy your photos into the `public/photos/` folder on your computer
+2. Name them anything — e.g. `first-date-1.jpg`, `japan-trip.jpg`
+3. Open Claude Code and say: **"Push the photos to GitHub"**
+4. Wait ~30 seconds for Vercel to redeploy
+5. Open your builder → select a chapter → click **"+ Pick photos"**
+6. Click the photos you want for that chapter (up to 5)
+7. Click **Save Book** — Ashley sees it instantly
 
-Then in Vercel dashboard → Settings → Environment Variables → add `BLOB_READ_WRITE_TOKEN`.
+---
 
-## How to Add Photos (Google Photos)
+## How to add a new chapter
 
-1. Open a photo in Google Photos on desktop
-2. Right-click the image → **Open image in new tab**
-3. Copy the URL from the address bar (starts with `lh3.googleusercontent.com`)
-4. Go to your builder → select a chapter → paste the URL → click Add
-5. Click **Save Book** when done
+1. Open the builder → **Chapters** tab
+2. Click **"+ Add Chapter"** at the bottom of the list
+3. Fill in the title, date, notes and pick photos
+4. Click **Save Book**
+
+---
+
+## How to reorder chapters
+
+- Hover over any chapter in the list → use the **↑ ↓** arrows to move it
+- Click **Save Book** when done
+
+---
+
+## How to edit your dedication message
+
+1. Open the builder → click **✉ Message** tab
+2. Edit the dedication (inside front cover) and back cover text
+3. Click **Save Changes**
+
+---
+
+## Storage breakdown
+- **Photos:** stored in GitHub repo (`public/photos/`) — free, no limits
+- **Chapter data:** stored in Vercel Blob — just a small JSON file (~10KB)
+

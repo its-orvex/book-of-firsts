@@ -11,7 +11,13 @@ export interface Chapter {
   photos: Photo[]
 }
 
+export interface BookConfig {
+  dedication: string
+  backMessage: string
+}
+
 export interface BookData {
   chapters: Chapter[]
+  config: BookConfig
   lastUpdated: string
 }
