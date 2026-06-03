@@ -1,12 +1,11 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { initialChapters } from '@/data/chapters'
 import { defaultConfig } from '@/data/config'
 import type { Chapter, BookConfig } from '@/lib/types'
 
 type Tab = 'message' | 'chapters'
-
 interface AvailablePhoto { name: string; url: string }
 
 export default function BuilderPage() {
@@ -22,6 +21,8 @@ export default function BuilderPage() {
   const [availablePhotos, setAvailablePhotos] = useState<AvailablePhoto[]>([])
   const [showPicker, setShowPicker] = useState(false)
   const [pickerSearch, setPickerSearch] = useState('')
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
 
   useEffect(() => {
     if (sessionStorage.getItem('auth') !== 'builder') { router.push('/'); return }
@@ -42,19 +43,11 @@ export default function BuilderPage() {
   }
 
   function addChapter() {
-    const newCh: Chapter = {
-      id: `ch-${Date.now()}`,
-      title: 'New chapter',
-      date: '',
-      notes: '',
-      photos: [],
-    }
+    const newCh: Chapter = { id: `ch-${Date.now()}`, title: 'New chapter', date: '', notes: '', photos: [] }
     setChapters(prev => [...prev, newCh])
     setSelected(newCh.id)
     setTab('chapters')
-    setTimeout(() => {
-      document.getElementById('chapter-title-input')?.focus()
-    }, 100)
+    setTimeout(() => document.getElementById('chapter-title-input')?.focus(), 100)
   }
 
   function deleteChapter(id: string) {
@@ -63,15 +56,15 @@ export default function BuilderPage() {
     if (selected === id) setSelected(null)
   }
 
-  function moveChapter(id: string, dir: 'up' | 'down') {
+  function reorderChapters(fromId: string, toId: string) {
     setChapters(prev => {
-      const idx = prev.findIndex(c => c.id === id)
-      if (dir === 'up' && idx === 0) return prev
-      if (dir === 'down' && idx === prev.length - 1) return prev
-      const next = [...prev]
-      const swap = dir === 'up' ? idx - 1 : idx + 1
-      ;[next[idx], next[swap]] = [next[swap], next[idx]]
-      return next
+      const arr = [...prev]
+      const from = arr.findIndex(c => c.id === fromId)
+      const to = arr.findIndex(c => c.id === toId)
+      if (from < 0 || to < 0) return prev
+      const [item] = arr.splice(from, 1)
+      arr.splice(to, 0, item)
+      return arr
     })
   }
 
@@ -80,8 +73,7 @@ export default function BuilderPage() {
     const ch = chapters.find(c => c.id === selected)
     if (!ch) return
     const photos = ch.photos ?? []
-    const exists = photos.some(p => p.url === url)
-    if (exists) {
+    if (photos.some(p => p.url === url)) {
       updateChapter(selected, { photos: photos.filter(p => p.url !== url) })
     } else {
       if (photos.length >= 5) return
@@ -89,15 +81,17 @@ export default function BuilderPage() {
     }
   }
 
-  function removePhoto(chapterId: string, idx: number) {
+  function removePhoto(idx: number) {
+    if (!selected) return
     setChapters(prev => prev.map(c =>
-      c.id !== chapterId ? c : { ...c, photos: (c.photos ?? []).filter((_, i) => i !== idx) }
+      c.id !== selected ? c : { ...c, photos: (c.photos ?? []).filter((_, i) => i !== idx) }
     ))
   }
 
-  function updateCaption(chapterId: string, idx: number, caption: string) {
+  function updateCaption(idx: number, caption: string) {
+    if (!selected) return
     setChapters(prev => prev.map(c => {
-      if (c.id !== chapterId) return c
+      if (c.id !== selected) return c
       const photos = [...(c.photos ?? [])]
       photos[idx] = { ...photos[idx], caption }
       return { ...c, photos }
@@ -119,14 +113,8 @@ export default function BuilderPage() {
     }
   }, [chapters, config])
 
-  const filtered = chapters.filter(c =>
-    !search || c.title.toLowerCase().includes(search.toLowerCase())
-  )
-
-  const filteredPhotos = availablePhotos.filter(p =>
-    !pickerSearch || p.name.toLowerCase().includes(pickerSearch.toLowerCase())
-  )
-
+  const filtered = chapters.filter(c => !search || c.title.toLowerCase().includes(search.toLowerCase()))
+  const filteredPhotos = availablePhotos.filter(p => !pickerSearch || p.name.toLowerCase().includes(pickerSearch.toLowerCase()))
   const assignedUrls = new Set((selectedChapter?.photos ?? []).map(p => p.url))
 
   if (!loaded) return (
@@ -142,16 +130,16 @@ export default function BuilderPage() {
         <div className="flex items-center gap-4">
           <button onClick={() => router.push('/')} className="text-muted text-xs tracking-widest hover:text-ink transition-colors">← EXIT</button>
           <div className="w-px h-4 bg-dust" />
-          <h1 className="font-sans text-sm font-medium text-ink">{chapters.length} chapters · {availablePhotos.length} photos available</h1>
+          <h1 className="font-sans text-sm font-medium text-ink">
+            {chapters.length} chapters · {availablePhotos.length} photos available
+          </h1>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={() => { sessionStorage.setItem('auth', 'book'); window.open('/book', '_blank') }}
             className="text-xs font-sans text-muted border border-dust px-4 py-2 hover:border-ink hover:text-ink transition-all"
           >Preview Book</button>
-          <button
-            onClick={save}
-            disabled={saving}
+          <button onClick={save} disabled={saving}
             className={`text-xs font-sans px-5 py-2 transition-all ${saved ? 'bg-green-600 text-white' : 'bg-ink text-white hover:bg-ink/90'}`}
           >{saving ? 'Saving...' : saved ? '✓ Saved' : 'Save Book'}</button>
         </div>
@@ -172,7 +160,7 @@ export default function BuilderPage() {
             <div className="flex-1 p-5 flex flex-col gap-4 overflow-y-auto">
               <div>
                 <p className="text-xs font-sans tracking-[0.15em] uppercase text-muted mb-1">Dedication</p>
-                <p className="text-xs text-muted/70 font-sans mb-2">First thing Ashley reads when she opens the book.</p>
+                <p className="text-xs text-muted/70 font-sans mb-2 leading-relaxed">First thing Ashley reads when she opens the book.</p>
                 <textarea value={config.dedication}
                   onChange={e => setConfig(c => ({ ...c, dedication: e.target.value }))}
                   rows={16}
@@ -184,7 +172,7 @@ export default function BuilderPage() {
                 <textarea value={config.backMessage}
                   onChange={e => setConfig(c => ({ ...c, backMessage: e.target.value }))}
                   rows={4}
-                  className="w-full font-sans text-xs text-ink bg-cream border border-dust px-3 py-2.5 resize-y leading-relaxed"
+                  className="w-full font-sans text-xs text-ink bg-cream border border-dust px-3 py-2.5 resize-y"
                 />
               </div>
               <button onClick={save} disabled={saving}
@@ -200,15 +188,39 @@ export default function BuilderPage() {
                   className="w-full text-xs font-sans py-2 px-3 border border-dust bg-cream placeholder-muted text-ink"
                 />
               </div>
+
+              {/* Drag-to-reorder chapter list */}
               <div className="overflow-y-auto flex-1">
+                <p className="text-xs text-muted/50 font-sans px-4 pt-3 pb-1">Drag chapters to reorder</p>
                 {filtered.map((ch, i) => {
                   const pc = (ch.photos ?? []).length
                   const isSelected = selected === ch.id
+                  const isDragging = dragId === ch.id
+                  const isDragOver = dragOverId === ch.id && dragId !== ch.id
+
                   return (
-                    <div key={ch.id} className={`group border-b border-dust/50 transition-colors ${isSelected ? 'bg-ink' : 'hover:bg-cream'}`}>
+                    <div
+                      key={ch.id}
+                      draggable
+                      onDragStart={() => setDragId(ch.id)}
+                      onDragOver={e => { e.preventDefault(); setDragOverId(ch.id) }}
+                      onDrop={() => {
+                        if (dragId && dragId !== ch.id) reorderChapters(dragId, ch.id)
+                        setDragId(null)
+                        setDragOverId(null)
+                      }}
+                      onDragEnd={() => { setDragId(null); setDragOverId(null) }}
+                      className={`group border-b border-dust/50 transition-all duration-150 ${
+                        isSelected ? 'bg-ink' : isDragOver ? 'bg-blue-50' : 'hover:bg-cream'
+                      } ${isDragging ? 'opacity-40' : ''} ${isDragOver ? 'border-t-2 border-t-blue-400' : ''}`}
+                    >
                       <div className="flex items-center">
-                        <button onClick={() => setSelected(ch.id)} className="flex-1 text-left px-4 py-3">
-                          <div className="flex items-start gap-3">
+                        {/* Drag handle */}
+                        <div className={`pl-3 pr-1 py-4 cursor-grab active:cursor-grabbing ${isSelected ? 'text-white/30' : 'text-stone-300'}`}
+                          style={{ fontSize: 12 }}>⠿</div>
+
+                        <button onClick={() => setSelected(ch.id)} className="flex-1 text-left py-3 pr-2">
+                          <div className="flex items-start gap-2">
                             <span className={`text-xs mt-0.5 shrink-0 tabular-nums ${isSelected ? 'text-white/50' : 'text-muted'}`}>
                               {String(i + 1).padStart(2, '0')}
                             </span>
@@ -221,20 +233,17 @@ export default function BuilderPage() {
                             </div>
                           </div>
                         </button>
-                        {/* Reorder + delete — show on hover */}
-                        <div className={`flex flex-col gap-0.5 pr-2 opacity-0 group-hover:opacity-100 transition-opacity ${isSelected ? 'opacity-100' : ''}`}>
-                          <button onClick={() => moveChapter(ch.id, 'up')} title="Move up"
-                            className={`text-xs px-1.5 py-0.5 rounded transition-colors ${isSelected ? 'text-white/60 hover:text-white' : 'text-muted hover:text-ink'}`}>↑</button>
-                          <button onClick={() => moveChapter(ch.id, 'down')} title="Move down"
-                            className={`text-xs px-1.5 py-0.5 rounded transition-colors ${isSelected ? 'text-white/60 hover:text-white' : 'text-muted hover:text-ink'}`}>↓</button>
-                          <button onClick={() => deleteChapter(ch.id)} title="Delete"
-                            className={`text-xs px-1.5 py-0.5 rounded transition-colors ${isSelected ? 'text-red-300 hover:text-red-200' : 'text-muted hover:text-red-400'}`}>×</button>
-                        </div>
+
+                        {/* Delete */}
+                        <button onClick={() => deleteChapter(ch.id)}
+                          className={`pr-3 opacity-0 group-hover:opacity-100 text-xs transition-opacity ${isSelected ? 'text-red-300 hover:text-red-200' : 'text-muted hover:text-red-400'}`}
+                          title="Delete chapter">×</button>
                       </div>
                     </div>
                   )
                 })}
               </div>
+
               {/* Add chapter */}
               <div className="p-3 border-t border-dust">
                 <button onClick={addChapter}
@@ -246,7 +255,7 @@ export default function BuilderPage() {
           )}
         </div>
 
-        {/* Editor */}
+        {/* Editor panel */}
         <div className="flex-1 overflow-y-auto">
           {tab === 'message' ? (
             <div className="h-full flex items-center justify-center text-center px-12">
@@ -272,7 +281,6 @@ export default function BuilderPage() {
                   className="text-xs text-muted hover:text-red-400 transition-colors font-sans">Delete chapter</button>
               </div>
 
-              {/* Title */}
               <div className="mb-5">
                 <label className="text-xs font-sans tracking-[0.15em] uppercase text-muted block mb-2">Title</label>
                 <textarea id="chapter-title-input"
@@ -284,7 +292,6 @@ export default function BuilderPage() {
                 />
               </div>
 
-              {/* Date */}
               <div className="mb-5">
                 <label className="text-xs font-sans tracking-[0.15em] uppercase text-muted block mb-2">Date</label>
                 <input type="text" value={selectedChapter.date}
@@ -294,7 +301,6 @@ export default function BuilderPage() {
                 />
               </div>
 
-              {/* Notes */}
               <div className="mb-8">
                 <label className="text-xs font-sans tracking-[0.15em] uppercase text-muted block mb-2">Notes / Memory</label>
                 <textarea value={selectedChapter.notes}
@@ -304,11 +310,11 @@ export default function BuilderPage() {
                 />
               </div>
 
-              {/* Photos assigned */}
-              <div className="mb-6">
+              {/* Photos */}
+              <div>
                 <div className="flex items-center justify-between mb-3">
                   <label className="text-xs font-sans tracking-[0.15em] uppercase text-muted">
-                    Assigned photos ({(selectedChapter.photos ?? []).length} / 5)
+                    Photos ({(selectedChapter.photos ?? []).length} / 5)
                   </label>
                   <button onClick={() => setShowPicker(p => !p)}
                     className="text-xs font-sans text-white bg-ink px-4 py-2 hover:bg-ink/90 transition-all">
@@ -324,10 +330,10 @@ export default function BuilderPage() {
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={photo.url} alt="" className="w-full h-full object-cover" />
                         </div>
-                        <button onClick={() => removePhoto(selected!, i)}
+                        <button onClick={() => removePhoto(i)}
                           className="absolute top-1 right-1 w-5 h-5 bg-black/60 text-white text-xs rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">×</button>
                         <input type="text" value={photo.caption ?? ''}
-                          onChange={e => updateCaption(selected!, i, e.target.value)}
+                          onChange={e => updateCaption(i, e.target.value)}
                           placeholder="Caption..."
                           className="w-full mt-1 text-xs font-sans border border-dust px-2 py-1 bg-cream text-ink"
                         />
@@ -336,30 +342,26 @@ export default function BuilderPage() {
                   </div>
                 ) : (
                   <div className="border-2 border-dashed border-dust py-8 flex items-center justify-center mb-4">
-                    <p className="text-muted text-xs font-sans">No photos assigned yet — click "+ Pick photos"</p>
+                    <p className="text-muted text-xs font-sans">No photos yet — click "+ Pick photos"</p>
                   </div>
                 )}
 
-                {/* Photo picker */}
                 {showPicker && (
                   <div className="border border-dust bg-white p-4">
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-xs font-sans font-medium text-ink">
-                        {availablePhotos.length === 0
-                          ? 'No photos found in /public/photos/'
-                          : `${availablePhotos.length} photos available — click to assign`}
+                        {availablePhotos.length === 0 ? 'No photos in /public/photos/ yet' : `${availablePhotos.length} photos — click to assign`}
                       </p>
                       <input type="text" placeholder="Search..." value={pickerSearch}
                         onChange={e => setPickerSearch(e.target.value)}
                         className="text-xs font-sans border border-dust px-2 py-1 bg-cream w-32"
                       />
                     </div>
-
                     {availablePhotos.length === 0 ? (
                       <div className="py-8 text-center">
                         <p className="text-muted text-xs font-sans leading-relaxed">
-                          Drop your photos into the <code className="bg-cream px-1">/public/photos/</code> folder,<br />
-                          push to GitHub, then refresh this page.
+                          Copy photos into <code className="bg-cream px-1 py-0.5 text-ink">/public/photos/</code><br />
+                          then ask Claude Code to push to GitHub.
                         </p>
                       </div>
                     ) : (
@@ -371,17 +373,13 @@ export default function BuilderPage() {
                             <button key={photo.name}
                               onClick={() => !isFull && togglePhoto(photo.url)}
                               disabled={isFull}
-                              className={`relative aspect-square overflow-hidden border-2 transition-all ${
-                                isAssigned ? 'border-green-500' : 'border-transparent hover:border-stone-300'
-                              } ${isFull ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}`}
+                              className={`relative aspect-square overflow-hidden border-2 transition-all ${isAssigned ? 'border-green-500' : 'border-transparent hover:border-stone-300'} ${isFull ? 'opacity-30 cursor-not-allowed' : ''}`}
                             >
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img src={photo.url} alt={photo.name} className="w-full h-full object-cover" />
-                              {isAssigned && (
-                                <div className="absolute top-1 right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-white text-xs">✓</div>
-                              )}
+                              {isAssigned && <div className="absolute top-1 right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-white text-xs">✓</div>}
                               <div className="absolute bottom-0 left-0 right-0 bg-black/50 px-1 py-0.5">
-                                <p className="text-white text-xs truncate" style={{ fontSize: 9 }}>{photo.name}</p>
+                                <p className="text-white truncate" style={{ fontSize: 9 }}>{photo.name}</p>
                               </div>
                             </button>
                           )
@@ -392,7 +390,7 @@ export default function BuilderPage() {
                 )}
               </div>
 
-              <div className="pt-6 border-t border-dust flex items-center justify-between">
+              <div className="mt-12 pt-6 border-t border-dust flex items-center justify-between">
                 <p className="text-xs text-muted font-sans">Changes go live for Ashley when you click Save Book.</p>
                 <button onClick={save} disabled={saving}
                   className="text-xs font-sans bg-ink text-white px-5 py-2 hover:bg-ink/90 transition-all disabled:opacity-50">
