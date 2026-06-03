@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-playfair: 'Playfair Display', Georgia, serif;
+  --font-dm-sans: 'DM Sans', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-dm-sans);
+  background: #FAF8F5;
+  color: #1A1A1A;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Page flip animation */
+@keyframes pageFlipNext {
+  0%   { transform: perspective(1200px) rotateY(0deg); opacity: 1; }
+  50%  { transform: perspective(1200px) rotateY(-90deg); opacity: 0.3; }
+  100% { transform: perspective(1200px) rotateY(-180deg); opacity: 0; }
+}
+@keyframes pageFlipPrev {
+  0%   { transform: perspective(1200px) rotateY(0deg); opacity: 1; }
+  50%  { transform: perspective(1200px) rotateY(90deg); opacity: 0.3; }
+  100% { transform: perspective(1200px) rotateY(180deg); opacity: 0; }
+}
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.page-enter {
+  animation: fadeSlideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.fade-in {
+  animation: fadeIn 0.4s ease forwards;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #D4CFC8; border-radius: 2px; }
+
+/* Input focus rings */
+input:focus, textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #1A1A1A20;
+}
